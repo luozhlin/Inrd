@@ -1,0 +1,70 @@
+% Low-Rank Tensor Completion (LRTC) based on TNN under linear transform
+%
+%
+% version 1.0 - 01/02/2019
+% version 1.1 - 29/04/2021
+%
+% Written by Canyi Lu (canyilu@gmail.com)
+% 
+% References:
+% Canyi Lu, Xi Peng, Yunchao Wei, Low-Rank Tensor Completion With a New Tensor 
+% Nuclear Norm Induced by Invertible Linear Transforms. IEEE International 
+% Conference on Computer Vision and Pattern Recognition (CVPR), 2019
+%
+
+clear;
+addpath('data');
+addpath("assess_fold");  
+
+filename = 'WHU_inpainting_7.mat';
+data_dir = './data';
+data_path = fullfile(data_dir, filename);
+load(data_path);
+
+X = input;
+[MM, N, B] = size(X);
+n = MM;
+n1 = MM;
+n2 = N;
+n3 = B;
+r = 5; % tubal rank
+
+% transform.L = @fft; transform.l = n3; transform.inverseL = @ifft;
+% transform.L = @dct; transform.l = 1; transform.inverseL = @idct;
+% L = dftmtx(n3); transform.l = n3; transform.L = L;
+% L = dct(eye(n3)); transform.l = 1; transform.L = L;
+L = RandOrthMat(n3); transform.l = 1; transform.L = L;
+
+%X = tprod(randn(n1,r,n3)/n1,randn(r,n2,n3)/n2,transform);
+
+trankX = tubalrank(X,transform);
+
+dr = (n1+n2-r)*r*n3;
+rho = 3;
+m = rho*dr;
+p = m/(n1*n2*n3);
+
+%omega = find(rand(n1*n2*n3,1)<p);
+omega = logical(mask);
+M = zeros(n1,n2,n3);
+M(omega) = X(omega);
+
+opts.DEBUG = 1;
+Xhat = lrtc_tnn(M,omega,transform,opts);
+
+trank = tubalrank(Xhat,transform);
+
+[NGmeet_PSNR,NGmeet_SSIM,NGmeet_SAM,NGmeet_MQ] = evaluate(gt,Xhat,MM,N);
+disp(['Method Name:LRTC  ', ', MPSNR=' num2str(mean(NGmeet_PSNR),'%5.2f')  ...
+           ',MSSIM = ' num2str(mean(NGmeet_SSIM),'%5.4f')  ',SAM=' num2str(NGmeet_SAM,'%5.2f')...
+           ',MQ=' num2str(mean(NGmeet_MQ),'%5.4f')]);
+
+result = Xhat;
+results_dir = './results';
+save_path = fullfile(results_dir, filename);
+
+save(save_path, 'result');
+disp(['数据已保存至: ', save_path]);
+
+
+
